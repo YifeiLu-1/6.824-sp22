@@ -1,10 +1,11 @@
 package mr
 
-import "fmt"
-import "log"
-import "net/rpc"
-import "hash/fnv"
-
+import (
+	"fmt"
+	"log"
+	"net/rpc"
+	"time"
+)
 
 //
 // Map functions return a slice of KeyValue.
@@ -15,55 +16,78 @@ type KeyValue struct {
 }
 
 //
-// use ihash(key) % NReduce to choose the reduce
-// task number for each KeyValue emitted by Map.
-//
-func ihash(key string) int {
-	h := fnv.New32a()
-	h.Write([]byte(key))
-	return int(h.Sum32() & 0x7fffffff)
-}
-
-
-//
 // main/mrworker.go calls this function.
 //
 func Worker(mapf func(string, string) []KeyValue,
 	reducef func(string, []string) string) {
 
-	// Your worker implementation here.
-
-	// uncomment to send the Example RPC to the coordinator.
-	// CallExample()
+	for {
+		// Your worker implementation here.
+		// get a task
+		reply := CallForTask()
+		if reply.IsSleep {
+			time.Sleep(2 * time.Second)
+			//fmt.Printf("worker sleep 2s\n")
+			continue
+		}
+		if reply.TaskType == "map" {
+			filename := reply.MapFileName
+			//fmt.Printf("doing map on %v\n", filename)
+			doMap(mapf, filename, reply.NReduce, reply.MapTaskNum)
+			FinishMapTask(filename)
+		} else if reply.TaskType == "reduce" {
+			//fmt.Printf("doing reduce on task %v \n", reply.ReduceTaskNum)
+			reduceTaskNum := reply.ReduceTaskNum
+			doReduce(reducef, reduceTaskNum, reply.TotalMapTaskNum)
+			FinishReduceTask(reduceTaskNum)
+			//fmt.Printf("doing reduce on task %v Done\n", reply.ReduceTaskNum)
+		}
+	}
 
 }
 
-//
-// example function to show how to make an RPC call to the coordinator.
-//
-// the RPC argument and reply types are defined in rpc.go.
-//
-func CallExample() {
+func CallForTask() *WorkerAskTaskReply {
+	args := &WorkerAskTaskArgs{}
+	reply := &WorkerAskTaskReply{}
 
-	// declare an argument structure.
-	args := ExampleArgs{}
-
-	// fill in the argument(s).
-	args.X = 99
-
-	// declare a reply structure.
-	reply := ExampleReply{}
-
-	// send the RPC request, wait for the reply.
-	// the "Coordinator.Example" tells the
-	// receiving server that we'd like to call
-	// the Example() method of struct Coordinator.
-	ok := call("Coordinator.Example", &args, &reply)
+	ok := call("Coordinator.DispatchTask", &args, &reply)
 	if ok {
-		// reply.Y should be 100.
-		fmt.Printf("reply.Y %v\n", reply.Y)
+		return reply
 	} else {
-		fmt.Printf("call failed!\n")
+		fmt.Printf("call for task failed!\n")
+		return nil
+	}
+}
+
+func FinishMapTask(mapTaskFilename string) *WorkerFinishTaskReply {
+	args := &WorkerFinishTaskArgs{
+		TaskType: "map",
+		FileName: mapTaskFilename,
+	}
+	reply := &WorkerFinishTaskReply{}
+
+	ok := call("Coordinator.FinishTask", &args, &reply)
+	if ok {
+		return reply
+	} else {
+		fmt.Printf("call for finish map task failed!\n")
+		return nil
+	}
+}
+
+func FinishReduceTask(reduceTaskNum int) *WorkerFinishTaskReply {
+	args := &WorkerFinishTaskArgs{
+		TaskType:      "reduce",
+		ReduceTaskNum: reduceTaskNum,
+	}
+	reply := &WorkerFinishTaskReply{}
+
+	ok := call("Coordinator.FinishTask", &args, &reply)
+	if ok {
+		return reply
+	} else {
+		fmt.Printf("call for finish reduce task failed!\n")
+		return nil
 	}
 }
 
