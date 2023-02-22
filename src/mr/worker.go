@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/rpc"
+	"sync"
 	"time"
 )
 
@@ -15,6 +16,9 @@ type KeyValue struct {
 	Value string
 }
 
+var done = false
+var mu sync.Mutex
+
 //
 // main/mrworker.go calls this function.
 //
@@ -24,6 +28,13 @@ func Worker(mapf func(string, string) []KeyValue,
 	for {
 		// Your worker implementation here.
 		// get a task
+		mu.Lock()
+		if done {
+			defer mu.Unlock()
+			return
+		}
+		mu.Unlock()
+
 		reply := CallForTask()
 		if reply.IsSleep {
 			time.Sleep(2 * time.Second)

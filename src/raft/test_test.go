@@ -929,6 +929,7 @@ func TestFigure8Unreliable2C(t *testing.T) {
 
 		if leader != -1 && (rand.Int()%1000) < int(RaftElectionTimeout/time.Millisecond)/2 {
 			cfg.disconnect(leader)
+			Debug(dTest, "S%d disconnect", leader)
 			nup -= 1
 		}
 
@@ -936,6 +937,7 @@ func TestFigure8Unreliable2C(t *testing.T) {
 			s := rand.Int() % servers
 			if cfg.connected[s] == false {
 				cfg.connect(s)
+				Debug(dTest, "S%d reconnect", s)
 				nup += 1
 			}
 		}
@@ -944,10 +946,14 @@ func TestFigure8Unreliable2C(t *testing.T) {
 	for i := 0; i < servers; i++ {
 		if cfg.connected[i] == false {
 			cfg.connect(i)
+			Debug(dTest, "S%d reconnect", i)
 		}
 	}
 
-	cfg.one(rand.Int()%10000, servers, true)
+	randomNum := rand.Int() % 10000
+	Debug(dTest, "try to cfg.one randomNum %d", randomNum)
+
+	cfg.one(randomNum, servers, true)
 
 	cfg.end()
 }
@@ -1024,6 +1030,7 @@ func internalChurn(t *testing.T, unreliable bool) {
 		if (rand.Int() % 1000) < 200 {
 			i := rand.Int() % servers
 			cfg.disconnect(i)
+			Debug(dTest, "S%d disconnect", i)
 		}
 
 		if (rand.Int() % 1000) < 500 {
@@ -1032,12 +1039,14 @@ func internalChurn(t *testing.T, unreliable bool) {
 				cfg.start1(i, cfg.applier)
 			}
 			cfg.connect(i)
+			Debug(dTest, "S%d reconnect", i)
 		}
 
 		if (rand.Int() % 1000) < 200 {
 			i := rand.Int() % servers
 			if cfg.rafts[i] != nil {
 				cfg.crash1(i)
+				Debug(dTest, "S%d crash", i)
 			}
 		}
 
@@ -1053,8 +1062,10 @@ func internalChurn(t *testing.T, unreliable bool) {
 	for i := 0; i < servers; i++ {
 		if cfg.rafts[i] == nil {
 			cfg.start1(i, cfg.applier)
+			Debug(dTest, "S%d restart", i)
 		}
 		cfg.connect(i)
+		Debug(dTest, "S%d reconnect", i)
 	}
 
 	atomic.StoreInt32(&stop, 1)
@@ -1128,10 +1139,12 @@ func snapcommon(t *testing.T, name string, disconnect bool, reliable bool, crash
 
 		if disconnect {
 			cfg.disconnect(victim)
+			Debug(dTest, "S%d disconnect", victim)
 			cfg.one(rand.Int(), servers-1, true)
 		}
 		if crash {
 			cfg.crash1(victim)
+			Debug(dTest, "S%d crashed", victim)
 			cfg.one(rand.Int(), servers-1, true)
 		}
 
@@ -1158,12 +1171,14 @@ func snapcommon(t *testing.T, name string, disconnect bool, reliable bool, crash
 			// reconnect a follower, who maybe behind and
 			// needs to rceive a snapshot to catch up.
 			cfg.connect(victim)
+			Debug(dTest, "S%d reconnect", victim)
 			cfg.one(rand.Int(), servers, true)
 			leader1 = cfg.checkOneLeader()
 		}
 		if crash {
 			cfg.start1(victim, cfg.applierSnap)
 			cfg.connect(victim)
+			Debug(dTest, "S%d restart", victim)
 			cfg.one(rand.Int(), servers, true)
 			leader1 = cfg.checkOneLeader()
 		}
@@ -1218,6 +1233,7 @@ func TestSnapshotAllCrash2D(t *testing.T) {
 
 		// crash all
 		for i := 0; i < servers; i++ {
+			Debug(dTest, "S%d crashed", i)
 			cfg.crash1(i)
 		}
 
@@ -1225,6 +1241,7 @@ func TestSnapshotAllCrash2D(t *testing.T) {
 		for i := 0; i < servers; i++ {
 			cfg.start1(i, cfg.applierSnap)
 			cfg.connect(i)
+			Debug(dTest, "S%d revive", i)
 		}
 
 		index2 := cfg.one(rand.Int(), servers, true)
