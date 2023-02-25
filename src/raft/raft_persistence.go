@@ -56,6 +56,6 @@ func (rf *Raft) readPersist(data []byte) {
 		rf.snapshotLastIncludedIndex = snapshotLastIncludedIndex
 		rf.snapshotLastIncludedTerm = snapshotLastIncludedTerm
 		rf.snapshot = rf.persister.ReadSnapshot()
-		Debug(dPersist, "S%d %s, readPersist success, logs length %d, capacity %d, snapshot size %d", rf.me, rf.state, len(rf.logs), cap(rf.logs), len(rf.snapshot))
+		Debug(dPersist, "S%d %s, readPersist success, logs length %d, snapshot size %d", rf.me, rf.state, len(rf.logs), len(rf.snapshot))
 	}
 }

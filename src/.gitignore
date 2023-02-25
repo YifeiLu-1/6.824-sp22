@@ -12,3 +12,5 @@ mrtmp.*
 /main/mrworker
 raft/.run
 raft/output.txt
+kvraft/.run
+kvraft/output.txt

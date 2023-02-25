@@ -1,12 +1,19 @@
 package kvraft
 
-import "6.824/labrpc"
+import (
+	"6.824/labrpc"
+	"sync"
+)
 import "crypto/rand"
 import "math/big"
 
 type Clerk struct {
 	servers []*labrpc.ClientEnd
 	// You will have to modify this struct.
+	mu              sync.Mutex
+	clientId        int64
+	requestId       int64
+	lastValidLeader int
 }
 
 func nrand() int64 {
@@ -20,6 +27,9 @@ func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
 	ck := new(Clerk)
 	ck.servers = servers
 	// You'll have to add code here.
+	ck.clientId = nrand()
+	ck.requestId = 0
+	ck.lastValidLeader = 0
 	return ck
 }
 
@@ -37,17 +47,34 @@ func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
 //
 func (ck *Clerk) Get(key string) string {
 	// You will have to modify this function.
-	peerId := 0
-	args := &GetArgs{
-		Key: key,
-	}
-	reply := &GetReply{}
+	ck.mu.Lock()
+	peerId := ck.lastValidLeader
+	ck.requestId++
+	requestId := ck.requestId
+	ck.mu.Unlock()
+
 	for {
-		ok := ck.servers[peerId].Call("KVServer.Get", &args, &reply)
+		args := &GetArgs{
+			Key:       key,
+			ClientId:  ck.clientId,
+			RequestId: requestId,
+		}
+		reply := &GetReply{}
+		Debug(dClient, "Client %d Get to S%d key %s, requestId %d", ck.clientId, peerId, key, requestId)
+		ok := ck.servers[peerId].Call("KVServer.Get", args, reply)
+		//Debug(dClient, "Client send get %s to S%d", key, peerId)
 		if ok && reply.Err == ErrNoKey {
+			ck.mu.Lock()
+			ck.lastValidLeader = peerId
+			Debug(dClient, "Client %d Get to S%d key %s, requestId %d, success, getVal %d", ck.clientId, peerId, key, requestId, reply.Value)
+			ck.mu.Unlock()
 			return ""
 		}
 		if ok && reply.Err == OK {
+			ck.mu.Lock()
+			ck.lastValidLeader = peerId
+			Debug(dClient, "Client %d Get to S%d key %s, requestId %d, success, getVal %d", ck.clientId, peerId, key, requestId, reply.Value)
+			ck.mu.Unlock()
 			return reply.Value
 		}
 		peerId = (peerId + 1) % len(ck.servers)
@@ -66,16 +93,27 @@ func (ck *Clerk) Get(key string) string {
 //
 func (ck *Clerk) PutAppend(key string, value string, op string) {
 	// You will have to modify this function.
-	peerId := 0
-	args := &PutAppendArgs{
-		Key:   key,
-		Value: value,
-		Op:    op,
-	}
-	reply := &PutAppendReply{}
+	ck.mu.Lock()
+	peerId := ck.lastValidLeader
+	ck.requestId++
+	requestId := ck.requestId
+	ck.mu.Unlock()
 	for {
-		ok := ck.servers[peerId].Call("KVServer.PutAppend", &args, &reply)
+		args := &PutAppendArgs{
+			Key:       key,
+			Value:     value,
+			Op:        op,
+			ClientId:  ck.clientId,
+			RequestId: requestId,
+		}
+		reply := &PutAppendReply{}
+		ok := ck.servers[peerId].Call("KVServer.PutAppend", args, reply)
+		Debug(dClient, "Client %d PutAppend to S%d key %s, value %s, requestId %d", ck.clientId, peerId, key, value, requestId)
 		if ok && reply.Err == OK {
+			ck.mu.Lock()
+			ck.lastValidLeader = peerId
+			Debug(dClient, "Client %d PutAppend to S%d key %s, value %s, requestId %d, success", ck.clientId, peerId, key, value, requestId)
+			ck.mu.Unlock()
 			return
 		}
 		peerId = (peerId + 1) % len(ck.servers)

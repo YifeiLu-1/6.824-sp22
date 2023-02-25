@@ -172,7 +172,6 @@ func (rf *Raft) applyMsgToStateMachineTicker() {
 			applyMsgs = append(applyMsgs, applyMsg)
 			rf.lastApplied = rf.snapshotLastIncludedIndex
 			rf.commitIndex = rf.snapshotLastIncludedIndex
-			Debug(dSnap, "S%d %s, send snapshot up, Term %d, Index %d", rf.me, rf.state, rf.snapshotLastIncludedTerm, rf.snapshotLastIncludedIndex)
 		} else {
 			for rf.commitIndex > rf.lastApplied {
 				rf.lastApplied++
@@ -182,7 +181,6 @@ func (rf *Raft) applyMsgToStateMachineTicker() {
 					CommandIndex: rf.lastApplied,
 				}
 				applyMsgs = append(applyMsgs, applyMsg)
-				Debug(dCommit, "S%d, send command %s up, CommandIndex %d", rf.me, applyMsg.Command, applyMsg.CommandIndex)
 			}
 		}
 
@@ -190,7 +188,14 @@ func (rf *Raft) applyMsgToStateMachineTicker() {
 		rf.mu.Unlock()
 
 		for _, applyMsg := range applyMsgs {
-			rf.applyCh <- applyMsg
+			if !rf.killed() {
+				if applyMsg.SnapshotValid {
+					Debug(dSnap, "S%d, send snapshot up, Term %d, Index %d", rf.me, applyMsg.SnapshotTerm, applyMsg.SnapshotIndex)
+				} else {
+					Debug(dCommit, "S%d, send command %s up, CommandIndex %d", rf.me, applyMsg.Command, applyMsg.CommandIndex)
+				}
+				rf.applyCh <- applyMsg
+			}
 		}
 	}
 }
@@ -292,7 +297,7 @@ func (rf *Raft) sendAppendEntriesToPeer(peerId int) {
 		Debug(dLog, "S%d %s, AppendEntries RPC PrevLogIndex %d to S%d for T%d, entries length %d, reply fail, decrement nextIndex to %d, matchIndex is %d", rf.me, rf.state, PrevLogIndex, peerId, Term, len(entriesCopied), rf.nextIndex[peerId], rf.matchIndex[peerId])
 		return
 	}
-	// Debug(dLog, "S%d %s, append entry rpc PrevLogIndex %d to S%d for T%d, entries length %d, reply success", rf.me, rf.state, PrevLogIndex, peerId, Term, len(entries))
+	//Debug(dLog, "S%d %s, append entry rpc PrevLogIndex %d to S%d for T%d, entries length %d, reply success", rf.me, rf.state, PrevLogIndex, peerId, Term, len(entries))
 
 	// success
 	rf.matchIndex[peerId] = max(PrevLogIndex+len(entriesCopied), rf.matchIndex[peerId])
@@ -324,6 +329,7 @@ func (rf *Raft) updateLeaderCommitIndex(proposedNewMatchIndex int) {
 	// figure 8
 
 	if rf.getLogAtIndex(proposedNewMatchIndex).Term != rf.currentTerm {
+		Debug(dCommit, "S%d %s, propose to update leaderCommitIndex to %d, current commitIndex is %d, proposedLogTerm %d, currentTerm %d", rf.me, rf.state, proposedNewMatchIndex, rf.commitIndex, rf.getLogAtIndex(proposedNewMatchIndex).Term, rf.currentTerm)
 		return
 	}
 
