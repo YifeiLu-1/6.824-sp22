@@ -2,6 +2,7 @@ package kvraft
 
 import (
 	"6.824/labrpc"
+	"6.824/util"
 	"sync"
 )
 import "crypto/rand"
@@ -60,20 +61,20 @@ func (ck *Clerk) Get(key string) string {
 			RequestId: requestId,
 		}
 		reply := &GetReply{}
-		Debug(dClient, "Client %d Get to S%d key %s, requestId %d", ck.clientId, peerId, key, requestId)
+		util.Debug(util.DClient, "Client %d Get to S%d key %s, requestId %d", ck.clientId, peerId, key, requestId)
 		ok := ck.servers[peerId].Call("KVServer.Get", args, reply)
 		//Debug(dClient, "Client send get %s to S%d", key, peerId)
 		if ok && reply.Err == ErrNoKey {
 			ck.mu.Lock()
 			ck.lastValidLeader = peerId
-			Debug(dClient, "Client %d Get to S%d key %s, requestId %d, success, getVal %d", ck.clientId, peerId, key, requestId, reply.Value)
+			util.Debug(util.DClient, "Client %d Get to S%d key %s, requestId %d, success, getVal %d", ck.clientId, peerId, key, requestId, reply.Value)
 			ck.mu.Unlock()
 			return ""
 		}
 		if ok && reply.Err == OK {
 			ck.mu.Lock()
 			ck.lastValidLeader = peerId
-			Debug(dClient, "Client %d Get to S%d key %s, requestId %d, success, getVal %d", ck.clientId, peerId, key, requestId, reply.Value)
+			util.Debug(util.DClient, "Client %d Get to S%d key %s, requestId %d, success, getVal %d", ck.clientId, peerId, key, requestId, reply.Value)
 			ck.mu.Unlock()
 			return reply.Value
 		}
@@ -108,11 +109,11 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 		}
 		reply := &PutAppendReply{}
 		ok := ck.servers[peerId].Call("KVServer.PutAppend", args, reply)
-		Debug(dClient, "Client %d PutAppend to S%d key %s, value %s, requestId %d", ck.clientId, peerId, key, value, requestId)
+		util.Debug(util.DClient, "Client %d PutAppend to S%d key %s, value %s, requestId %d", ck.clientId, peerId, key, value, requestId)
 		if ok && reply.Err == OK {
 			ck.mu.Lock()
 			ck.lastValidLeader = peerId
-			Debug(dClient, "Client %d PutAppend to S%d key %s, value %s, requestId %d, success", ck.clientId, peerId, key, value, requestId)
+			util.Debug(util.DClient, "Client %d PutAppend to S%d key %s, value %s, requestId %d, success", ck.clientId, peerId, key, value, requestId)
 			ck.mu.Unlock()
 			return
 		}

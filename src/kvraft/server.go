@@ -4,6 +4,7 @@ import (
 	"6.824/labgob"
 	"6.824/labrpc"
 	"6.824/raft"
+	"6.824/util"
 	"bytes"
 	"sync"
 	"sync/atomic"
@@ -126,7 +127,7 @@ func (kv *KVServer) CommonGetPutAppendOnce(getOp func() Op, clientId int64, requ
 
 	index, _, isLeader := kv.rf.Start(op)
 	if isLeader {
-		Debug(dClient, "S%d kvraft Start, index %d, isLeader %t, opType %s", kv.me, index, isLeader, GetOp)
+		util.Debug(util.DClient, "S%d kvraft Start, index %d, isLeader %t, opType %s", kv.me, index, isLeader, GetOp)
 	}
 	if !isLeader {
 		return CommonGetPutAppendReply{}, false, false
@@ -139,7 +140,7 @@ func (kv *KVServer) CommonGetPutAppendOnce(getOp func() Op, clientId int64, requ
 	response, isFinished := kv.requestStatus(clientId, requestId)
 
 	if isFinished {
-		Debug(dClient, "S%d kvraft CommonGetPutAppend return on cached response", kv.me, response)
+		util.Debug(util.DClient, "S%d kvraft CommonGetPutAppend return on cached response", kv.me, response)
 		return response, isLeader, true
 	}
 
@@ -150,7 +151,7 @@ func (kv *KVServer) CommonGetPutAppendOnce(getOp func() Op, clientId int64, requ
 	}
 
 	response, ok := kv.requestStatus(clientId, requestId)
-	Debug(dClient, "S%d kvraft awakes, kv.commitIndex %d, index %d, response %s", kv.me, kv.commitIndex, index, response)
+	util.Debug(util.DClient, "S%d kvraft awakes, kv.commitIndex %d, index %d, response %s", kv.me, kv.commitIndex, index, response)
 	return response, true, ok
 }
 
@@ -166,7 +167,7 @@ func (kv *KVServer) requestStatus(clientId int64, requestId int64) (CommonGetPut
 }
 
 func (kv *KVServer) setHighestRequestReceived(clientId int64, requestId int64) {
-	Debug(dClient, "S%d kvraft setHighestRequestReceived, clientId %d, requestId %d", kv.me, clientId, requestId)
+	util.Debug(util.DClient, "S%d kvraft setHighestRequestReceived, clientId %d, requestId %d", kv.me, clientId, requestId)
 	previousHighestRequestId, ok := kv.highestRequestReceived[clientId]
 	if !ok {
 		kv.highestRequestReceived[clientId] = requestId
@@ -220,7 +221,7 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 	labgob.Register(Op{})
 	labgob.Register(CommonGetPutAppendReply{})
 
-	Debug(dClient, "S%d kvraft starts", me)
+	util.Debug(util.DClient, "S%d kvraft starts", me)
 
 	kv := new(KVServer)
 	kv.me = me
@@ -259,11 +260,11 @@ func (kv *KVServer) applyChListener() {
 		kv.mu.Lock()
 
 		if applyMsg.SnapshotValid {
-			Debug(dClient, "S%d kvraft received applyMsg snapshot, index %d", kv.me, applyMsg.SnapshotIndex)
+			util.Debug(util.DClient, "S%d kvraft received applyMsg snapshot, index %d", kv.me, applyMsg.SnapshotIndex)
 			kv.commitIndex = applyMsg.SnapshotIndex
 			kv.readSnapshot(applyMsg.Snapshot)
 		} else {
-			Debug(dClient, "S%d kvraft received applyMsg command, index %d", kv.me, applyMsg.CommandIndex)
+			util.Debug(util.DClient, "S%d kvraft received applyMsg command, index %d", kv.me, applyMsg.CommandIndex)
 			kv.commitIndex = applyMsg.CommandIndex
 			if applyMsg.Command != nil {
 				op := applyMsg.Command.(Op)
@@ -299,7 +300,7 @@ func (kv *KVServer) applyOpAndCacheResponse(op *Op) {
 			response.Err = ErrNoKey
 			response.Value = ""
 		}
-		Debug(dClient, "S%d process applyMsg command, clientId %d, requestId %d, response %s", kv.me, clientId, requestId, response)
+		util.Debug(util.DClient, "S%d process applyMsg command, clientId %d, requestId %d, response %s", kv.me, clientId, requestId, response)
 		kv.setHighestRequestReceived(clientId, requestId-1)
 		kv.requestResults[clientId][requestId] = response
 		return
@@ -310,7 +311,7 @@ func (kv *KVServer) applyOpAndCacheResponse(op *Op) {
 		} else {
 			kv.KVTable[op.Key] = kv.KVTable[op.Key] + op.Value
 		}
-		Debug(dClient, "S%d process applyMsg command, clientId %d, requestId %d, response %s", kv.me, clientId, requestId, response)
+		util.Debug(util.DClient, "S%d process applyMsg command, clientId %d, requestId %d, response %s", kv.me, clientId, requestId, response)
 		kv.setHighestRequestReceived(clientId, requestId-1)
 		kv.requestResults[clientId][requestId] = response
 		return
@@ -346,7 +347,7 @@ func (kv *KVServer) readSnapshot(data []byte) {
 	if isDecodeKVTableSuccess != nil ||
 		isDecodeRequestResultsSuccess != nil ||
 		isDecodehighestRequestReceivedSuccess != nil {
-		Debug(dClient, "S%d, kvraft read snapshot failed, KVtable success %t, requestresults success %t, highest success %d", kv.me, isDecodeKVTableSuccess, isDecodeRequestResultsSuccess, isDecodehighestRequestReceivedSuccess)
+		util.Debug(util.DClient, "S%d, kvraft read snapshot failed, KVtable success %t, requestresults success %t, highest success %d", kv.me, isDecodeKVTableSuccess, isDecodeRequestResultsSuccess, isDecodehighestRequestReceivedSuccess)
 	} else {
 		kv.KVTable = KVTable
 		kv.requestResults = requestResults

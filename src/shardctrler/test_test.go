@@ -1,6 +1,7 @@
 package shardctrler
 
 import (
+	"6.824/util"
 	"fmt"
 	"sync"
 	"testing"
@@ -102,17 +103,21 @@ func TestBasic(t *testing.T) {
 	check(t, []int{gid1, gid2}, ck)
 	cfa[2] = ck.Query(-1)
 
+	util.Debug(util.DTest, "TestBasic 1")
+
 	cfx := ck.Query(-1)
 	sa1 := cfx.Groups[gid1]
 	if len(sa1) != 3 || sa1[0] != "x" || sa1[1] != "y" || sa1[2] != "z" {
 		t.Fatalf("wrong servers for gid %v: %v\n", gid1, sa1)
 	}
+	util.Debug(util.DTest, "TestBasic 2")
 	sa2 := cfx.Groups[gid2]
 	if len(sa2) != 3 || sa2[0] != "a" || sa2[1] != "b" || sa2[2] != "c" {
 		t.Fatalf("wrong servers for gid %v: %v\n", gid2, sa2)
 	}
 
 	ck.Leave([]int{gid1})
+	util.Debug(util.DTest, "TestBasic 2")
 	check(t, []int{gid2}, ck)
 	cfa[4] = ck.Query(-1)
 
